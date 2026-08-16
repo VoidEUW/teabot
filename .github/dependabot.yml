@@ -1,0 +1,87 @@
+# Dependabot — Ablage: .github/dependabot.yml
+#
+# Öffnet automatisch PRs für Abhängigkeits-Updates. Die laufen durch CI und
+# durch CodeRabbit wie jeder andere PR — dadurch bleibt "aktuell halten" eine
+# Routine statt einer Aufräumaktion alle sechs Monate.
+
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # Python. Dependabot unterstützt uv-Lockfiles nativ.
+  # Falls dein Setup damit Probleme macht: package-ecosystem auf "pip"
+  # ändern — das deckt pyproject.toml ebenfalls ab.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    labels:
+      - "dependencies"
+    groups:
+      # Patch- und Minor-Updates gebündelt: ein PR statt zwölf.
+      python-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      # Sicherheitsupdates kommen einzeln und sofort, nicht gebündelt.
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # Major-Updates bewusst von Hand. discord.py und SQLAlchemy brechen bei
+      # Majors regelmäßig APIs — das gehört gelesen, nicht gemergt.
+      - dependency-name: "discord.py"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions. Wichtig bei öffentlichem Repo mit self-hosted Runner:
+  # veraltete Actions sind ein realer Angriffsvektor.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # ---------------------------------------------------------------------------
+  # Basis-Image im Dockerfile
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(docker)"
+    labels:
+      - "dependencies"
+      - "docker"

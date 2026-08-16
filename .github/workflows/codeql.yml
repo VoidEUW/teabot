@@ -1,0 +1,41 @@
+name: CodeQL
+
+# Statische Sicherheitsanalyse von GitHub. Für öffentliche Repositories
+# kostenlos. Findet andere Klassen von Problemen als Ruff — Injection,
+# unsichere Deserialisierung, Pfad-Traversal.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Wöchentlich, damit neue Regeln auch ohne Codeänderung greifen.
+    - cron: "17 5 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          # "security-extended" findet mehr, mit etwas mehr Rauschen.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"

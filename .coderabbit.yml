@@ -1,0 +1,134 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Doku:      https://docs.coderabbit.ai/getting-started/yaml-configuration
+# Validator: https://docs.coderabbit.ai/reference/yaml-validator
+#
+# Diese Datei hat Vorrang vor allen UI-Einstellungen.
+# Aktuelle Konfiguration prüfen: in einem PR "@coderabbitai configuration" kommentieren.
+
+language: "de-DE"
+early_access: false
+
+reviews:
+  # "assertive" gibt mehr Rückmeldung, auch zu Kleinigkeiten.
+  # Für ein Projekt, in dem ein Agent den ersten Wurf schreibt, ist das richtig —
+  # später ggf. auf "chill" reduzieren.
+  profile: assertive
+
+  high_level_summary: true
+  collapse_walkthrough: false
+  review_status: true
+  poem: false
+
+  # Kein automatisches "Changes requested" — Blockieren entscheidest du.
+  request_changes_workflow: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+  # Prüfungen jenseits der reinen Diff-Lektüre
+  tools:
+    ruff:
+      enabled: true
+    gitleaks:
+      enabled: true          # Secrets im Diff
+    hadolint:
+      enabled: true          # Dockerfile
+    actionlint:
+      enabled: true          # GitHub-Workflows
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+
+  # ---------------------------------------------------------------------------
+  # Projektspezifische Regeln. Das ist der eigentliche Nutzen: CodeRabbit prüft
+  # die Architektur aus ARCHITECTURE.md, nicht nur allgemeines Python.
+  # ---------------------------------------------------------------------------
+  path_instructions:
+    - path: "src/teabot/modules/**/service.py"
+      instructions: |
+        Diese Datei ist die framework-agnostische Domänenschicht.
+        Melde als Verstoß, wenn:
+        - `discord`, `fastapi` oder `starlette` importiert wird
+        - `HTTPException` verwendet statt einer Domain-Exception geworfen wird
+        - direkt auf einen Discord-Client zugegriffen wird statt über BotGateway
+        - synchrone I/O vorkommt (requests, time.sleep, offenes open() im Async-Pfad)
+        Prüfe außerdem, ob Geschäftsregeln hier liegen und nicht in Adaptern.
+
+    - path: "src/teabot/modules/**/cog.py"
+      instructions: |
+        Dünner Discord-Adapter. Melde, wenn Domänenlogik hier steht statt im
+        Service — insbesondere Verzweigungen über Domänenzustand, Berechnungen
+        oder direkte DB-Queries. Erlaubt sind: Eingabe entgegennehmen,
+        Berechtigung prüfen, Service aufrufen, Antwort formatieren.
+        Der Cog darf keinen Router importieren.
+
+    - path: "src/teabot/modules/**/router.py"
+      instructions: |
+        Dünner HTTP-Adapter, liefert HTML oder Fragmente (kein REST-API-Design).
+        Melde, wenn Domänenlogik hier steht statt im Service, wenn ein Cog
+        importiert wird, oder wenn eine Route ohne Berechtigungs-Dependency
+        auskommt, obwohl sie Daten verändert.
+
+    - path: "src/teabot/modules/**/models.py"
+      instructions: |
+        Melde, wenn eine persistierte Tabelle kein `guild_id` hat.
+        Discord-IDs müssen BigInteger sein, nicht String oder Integer.
+        Prüfe, ob zur Modelländerung eine Alembic-Migration im selben PR liegt.
+
+    - path: "src/teabot/modules/**"
+      instructions: |
+        Vertical Slice: Module dürfen einander nicht importieren.
+        Melde jeden Import aus einem anderen Verzeichnis unter modules/.
+        Kommunikation läuft über den Event Bus oder deklarierte Abhängigkeiten.
+
+    - path: "src/teabot/core/**"
+      instructions: |
+        Infrastruktur. Änderungen an Registry, Gateway, Permissions oder
+        Settings-Framework sind architektonisch heikel — weise explizit darauf
+        hin und prüfe gegen ARCHITECTURE.md.
+
+    - path: "src/teabot/**"
+      instructions: |
+        Bot und Web teilen sich einen Event Loop. Melde jede blockierende
+        Operation im Request- oder Event-Pfad. Prüfe, ob asyncio.Tasks einen
+        Done-Callback mit Fehlerbehandlung haben — stille Task-Exceptions sind
+        in diesem Projekt ein bekanntes Fehlermuster.
+        Sicherheitsrelevant: fehlende Autorisierungsprüfungen, ungeprüfte
+        Nutzereingaben in SQL oder Templates, Secrets im Code.
+
+    - path: "alembic/versions/*.py"
+      instructions: |
+        Prüfe, ob downgrade() sinnvoll implementiert ist und ob die Migration
+        Bestandsdaten zerstören könnte. SQLite kann viele ALTER-Operationen
+        nicht — weise auf batch_alter_table hin, wo nötig.
+
+    - path: ".github/workflows/*.yml"
+      instructions: |
+        Öffentliches Repo mit self-hosted Runner. Melde als Sicherheitsproblem:
+        - Verwendung von `pull_request_target`
+        - Jobs mit `runs-on: [self-hosted, ...]`, die durch Fork-PRs auslösbar sind
+        - Secrets, die in Logs landen könnten
+        - Actions ohne gepinnte Version
+
+    - path: "**/*.html"
+      instructions: |
+        Jinja-Templates. Melde Berechtigungslogik im Template (gehört in den
+        Router) und jede Verwendung von |safe oder autoescape false auf
+        nutzergenerierten Daten.
+
+  # Kein Review für Generiertes
+  path_filters:
+    - "!uv.lock"
+    - "!**/*.min.js"
+    - "!**/static/vendor/**"
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: local

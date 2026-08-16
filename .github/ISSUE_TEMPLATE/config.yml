@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Architekturfrage
+    url: https://github.com/VoidEUW/teabot/blob/main/ARCHITECTURE.md
+    about: Struktur, Schichten und harte Regeln stehen in ARCHITECTURE.md.
+  - name: Entscheidungshistorie
+    url: https://github.com/VoidEUW/teabot/tree/main/docs/adr
+    about: Warum etwas so ist, wie es ist — die ADRs beantworten das meiste.

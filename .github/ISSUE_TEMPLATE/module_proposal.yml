@@ -1,0 +1,76 @@
+name: Neues Modul
+description: Ein neuer Vertical Slice unter src/teabot/modules/
+labels: ["module", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Für ein komplettes neues Feature-Modul. Für eine Erweiterung eines
+        bestehenden Moduls nimm stattdessen das Feature-Template.
+
+  - type: input
+    id: name
+    attributes:
+      label: Modulname
+      description: klein, Singular oder Plural, entspricht dem Ordnernamen
+      placeholder: citations
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Zweck
+      description: Was leistet das Modul, in zwei bis drei Sätzen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: model
+    attributes:
+      label: Datenmodell
+      description: Entitäten, wichtigste Felder, Beziehungen. `guild_id` nicht vergessen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: service
+    attributes:
+      label: Service-Operationen
+      description: Öffentliche Funktionen und die Invarianten, die sie durchsetzen.
+      placeholder: |
+        create(...)   – nur wenn Modul aktiviert
+        close(...)    – nur Ersteller oder Moderator
+    validations:
+      required: true
+
+  - type: textarea
+    id: adapters
+    attributes:
+      label: Adapter
+      description: Welche Slash-Commands, Listener und Web-Routen greifen darauf zu?
+
+  - type: textarea
+    id: permissions
+    attributes:
+      label: Berechtigungen
+      placeholder: citations.create, citations.delete, citations.view
+
+  - type: textarea
+    id: settings
+    attributes:
+      label: Einstellungen
+      description: Key, Typ, Default, ob `dev_only`
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Abhängigkeiten
+      description: Andere Module oder externe Dienste. Direkte Modul-Imports sind nicht erlaubt — was läuft über den Event Bus?
+
+  - type: checkboxes
+    id: gateway
+    attributes:
+      label: Discord-Ausgang
+      options:
+        - label: Das Modul sendet aus der Web-Richtung an Discord und braucht das BotGateway

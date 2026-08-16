@@ -1,0 +1,86 @@
+name: Deploy
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch oder Tag zum Deployen"
+        required: false
+        default: "main"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fuchs
+    # Runner läuft nativ auf Fuchs, auf derselben Maschine wie Docker.
+    # Das zweite Label stellt sicher, dass der Job auf genau diesem Host
+    # landet, falls später weitere Runner dazukommen.
+    runs-on: [self-hosted, fuchs]
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Show target
+        run: |
+          echo "Ref:    ${{ inputs.ref || github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+
+      # .env liegt persistent auf dem Host und wird NICHT aus dem Repo erzeugt.
+      - name: Verify environment file
+        run: |
+          test -f "${DEPLOY_DIR}/.env" || {
+            echo "::error::${DEPLOY_DIR}/.env fehlt auf dem Host."
+            exit 1
+          }
+        env:
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+
+      - name: Backup database
+        working-directory: ${{ vars.DEPLOY_DIR }}
+        run: |
+          mkdir -p backups
+          STAMP=$(date +%Y%m%d-%H%M%S)
+          if [ -f data/teabot.db ]; then
+            sqlite3 data/teabot.db "VACUUM INTO 'backups/teabot-${STAMP}.db'"
+            echo "Backup: backups/teabot-${STAMP}.db"
+          fi
+          # Nur die letzten 14 Backups behalten
+          ls -1t backups/teabot-*.db 2>/dev/null | tail -n +15 | xargs -r rm --
+
+      - name: Build image
+        run: docker compose build --pull
+
+      - name: Run migrations
+        run: docker compose run --rm app uv run alembic upgrade head
+
+      - name: Restart stack
+        run: docker compose up -d --remove-orphans
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:${{ vars.APP_PORT }}/health > /dev/null; then
+              echo "Healthy nach ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Health check fehlgeschlagen"
+          docker compose logs --tail=100 app
+          exit 1
+
+      - name: Prune dangling images
+        if: success()
+        run: docker image prune -f
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=200

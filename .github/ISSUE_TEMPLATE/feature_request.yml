@@ -1,0 +1,61 @@
+name: Feature
+description: Neue Funktionalität in einem bestehenden Modul
+labels: ["feature", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Welches konkrete Problem löst das? Kein Lösungsvorschlag, sondern die Situation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Vorgeschlagene Lösung
+    validations:
+      required: true
+
+  - type: input
+    id: module
+    attributes:
+      label: Modul
+      placeholder: tickets, announcements, violations …
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Einstiegspunkte
+      description: Über welche Adapter soll das erreichbar sein?
+      options:
+        - label: Slash-Command / Discord-Interaktion
+        - label: Web-Dashboard
+        - label: Automatisch (Listener, Scheduler)
+
+  - type: textarea
+    id: data
+    attributes:
+      label: Datenmodell
+      description: Neue Tabellen oder Felder? Neue Einstellungen? Neue Berechtigungen?
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Roadmap-Phase
+      description: Siehe ARCHITECTURE.md §11
+      options:
+        - Phase 1 — Bot & Logging
+        - Phase 2 — Auth & Permissions
+        - Phase 3 — Settings & Admin-Shell
+        - Phase 4 — Tickets (Referenzmodul)
+        - Phase 5 — weitere Module
+        - Phase 6 — Härtung
+        - Nach v1.0
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Verworfene Alternativen

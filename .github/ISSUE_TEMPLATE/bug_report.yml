@@ -1,0 +1,64 @@
+name: Bug
+description: Etwas verhält sich nicht wie erwartet
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Beschreibung
+      description: Was passiert, und was hättest du stattdessen erwartet?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zur Reproduktion
+      placeholder: |
+        1. Im Dashboard auf …
+        2. Slash-Command `/ticket close` ausführen
+        3. Fehler erscheint
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Wo tritt es auf?
+      options:
+        - Discord (Bot)
+        - Web (Dashboard)
+        - Beides
+        - Deployment / CI
+        - Unklar
+    validations:
+      required: true
+
+  - type: input
+    id: module
+    attributes:
+      label: Betroffenes Modul
+      placeholder: tickets, logging, auth, core …
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevanter Ausschnitt aus dem Log-Terminal oder `docker compose logs`. Bitte Token und IDs schwärzen.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / Commit
+      placeholder: v0.3.1 oder Commit-SHA
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Vorab geprüft
+      options:
+        - label: Ich habe nach einem bestehenden Issue gesucht
+          required: true
+        - label: Ich habe keine Secrets in diesem Issue veröffentlicht
+          required: true
