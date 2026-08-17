@@ -92,7 +92,7 @@ wird.
 `BotGateway`-Protokoll mit Discord (§7.6). Ein Wechsel auf Subprozesse
 erfordert eine neue Gateway-Implementierung — nicht mehr.
 
-Details: `docs/20260813_ARCHITECTURE.md`
+Details: `docs/adr/0001-in-process-architecture.md`
 
 ---
 
@@ -152,6 +152,12 @@ Diese Punkte sind nicht verhandelbar und werden im Review geprüft:
 6. **Keine Secrets im Repo.** Nur `.env.example` wird versioniert.
 7. **Keine rohen Discord-IDs als Strings.** IDs sind `int` (Snowflakes), in der
    DB `BigInteger`.
+8. **Alle Zeitstempel in UTC**, durchgängig timezone-aware
+   (`datetime.now(timezone.utc)`, niemals `utcnow()`). Umrechnung in Ortszeit
+   erst im Template. SQLite hat keine Zeitzonenunterstützung — eine Umstellung
+   der Serverzeitzone würde sonst Bestandsdaten unbrauchbar machen.
+9. **Domain-Exceptions statt Framework-Exceptions** unterhalb der
+   Adapterschicht. Kein `HTTPException` in einem Service (§7.8).
 
 ---
 
@@ -166,6 +172,7 @@ modules/tickets/
 ├── models.py        SQLAlchemy-Modelle
 ├── schemas.py       Pydantic: Ein- und Ausgabe
 ├── service.py       Domänenlogik, framework-agnostisch
+├── exceptions.py    modulspezifische Fehler, erben aus core/exceptions/
 ├── router.py        FastAPI-Routen (HTML/Fragmente)
 ├── cog.py           discord.py Commands und Listener
 ├── settings.py      Settings-Schema des Moduls
@@ -280,6 +287,39 @@ Fehler an. Eine Outbox mit späterer Zustellung ist bewusst v1.1.
 
 Shutdown-Reihenfolge: erst Bot schließen, dann DB-Engine disposen.
 
+### 7.8 Exception-Hierarchie
+
+`core/exceptions/` ist ein Paket, gegliedert nach **Fehlerart** — nicht nach
+Modul. Eine Datei pro Fehlerquelle hält die Basisklassen überschaubar und lässt
+Raum für neue Kategorien, ohne dass `core/` je ein Modul kennt.
+
+```
+core/exceptions/
+├── __init__.py        re-exportiert die öffentliche Oberfläche
+├── base.py            TeaBotError als Wurzel
+├── access.py          PermissionDenied, NotAuthenticated
+├── data.py            NotFound, Conflict, ValidationFailed
+├── bot.py             BotUnavailable, ClientNotReady
+└── config.py          ConfigurationError
+```
+
+**Modulspezifische Fehler gehören ins Modul**, nicht hierher:
+`modules/tickets/exceptions.py` mit `TicketNotOpen(Conflict)`. Eine
+`core/exceptions/tickets.py` wäre ein Verstoß gegen §5.2 — `core/` darf Module
+nicht kennen.
+
+Regeln:
+
+- Alles erbt von `TeaBotError`; ein `except TeaBotError` fängt alles Eigene
+- Jede Exception trägt eine maschinenlesbare Kennung und eine nutzerlesbare
+  Nachricht getrennt voneinander
+- Die Übersetzung nach HTTP-Status bzw. Discord-Antwort passiert **einmal**
+  zentral: als Exception-Handler in `app/` und als Fehlerbehandlung in
+  `bot/base.py`. Kein `try/except` pro Route
+- Nutzerlesbare Nachrichten enthalten keine internen Pfade, IDs oder
+  Stacktraces; Details gehen ins Log
+- Bei Autorisierungsfehlern wird nicht offengelegt, ob ein Objekt existiert
+
 ---
 
 ## 8. Datenhaltung
@@ -288,10 +328,24 @@ Shutdown-Reihenfolge: erst Bot schließen, dann DB-Engine disposen.
 - Beim Connect gesetzt: `journal_mode=WAL`, `busy_timeout`, `foreign_keys=ON`,
   `synchronous=NORMAL`
 - Alle Modelle erben von einer `Base` mit `id`, `created_at`, `updated_at`
+- Zeitstempel sind `DateTime(timezone=True)` und werden in UTC geschrieben
+- Naming Convention für Constraints in der `Base` — ohne sie erzeugt Alembic
+  bei SQLite unbenannte Constraints, die später nicht änderbar sind
 - Schreibzugriffe laufen über `session_scope()` — ein Kontextmanager, der
   committet oder zurückrollt; kein manuelles `commit()` in Services verstreut
 - Backup: `VACUUM INTO` per Cron; Litestream als Option für kontinuierliche
   Replikation
+
+### Alembic und dynamische Modul-Discovery
+
+Autogenerate erkennt nur Modelle, die zum Zeitpunkt des Laufs **importiert**
+sind. Module werden aber dynamisch von der Registry gefunden. `alembic/env.py`
+muss deshalb dieselbe Discovery ausführen, bevor `target_metadata` gesetzt wird.
+
+Ohne das erzeugt `alembic revision --autogenerate` eine leere Migration —
+ohne Fehlermeldung. Der `alembic check`-Step in CI schlägt dann an, aber die
+Ursache ist von der Meldung her nicht erkennbar. Das ist die wichtigste
+Fußangel des Registry-Ansatzes und keine Nebensache.
 
 ---
 
@@ -301,49 +355,93 @@ Shutdown-Reihenfolge: erst Bot schließen, dann DB-Engine disposen.
 teabot/
 ├── ARCHITECTURE.md
 ├── AGENTS.md
+├── SECURITY.md
+├── README.md
+├── LICENSE
 ├── pyproject.toml
 ├── Dockerfile
-├── compose.yaml
-├── alembic/
-├── data/                       Volume: teabot.db, Uploads
-├── docs/adr/
+├── compose.yml
+├── main.py                        Prozess-Starter (dünn)
+├── alembic/                       env.py führt Modul-Discovery aus
+├── data/                          Volume: teabot.db, Uploads
+├── docs/
+│   ├── adr/
+│   ├── branching.md
+│   ├── deployment/runner.md
+│   ├── frontend-design.md
+│   └── security-baseline.md
 ├── tests/
 └── src/teabot/
-    ├── main.py                 Composition Root
-    ├── config.py
-    ├── db/                     engine, session, Base, Mixins
+    ├── teabot.py                  CLI, Uvicorn-Start
+    ├── config.py                  pydantic-settings
+    ├── app/                       Composition Root
     ├── core/
     │   ├── registry.py
     │   ├── events.py
     │   ├── security.py
     │   ├── logbus.py
-    │   └── gateway.py
+    │   ├── gateway.py             nur das Protokoll
+    │   ├── settings.py
+    │   ├── permissions.py
+    │   └── exceptions/            Basisklassen, nach Fehlerart gegliedert
+    ├── db/                        engine, session, Base, Mixins
     ├── bot/
-    │   ├── client.py           Factory
+    │   ├── client.py              Factory
     │   ├── manager.py
-    │   └── base.py             BaseCog
+    │   ├── base.py                BaseCog
+    │   └── gateway.py             Implementierung des Protokolls
     ├── web/
-    │   ├── app.py
     │   ├── deps.py
+    │   ├── design/                Harness unter /design
     │   ├── templates/
     │   └── static/
-    └── modules/
+    └── modules/                   Vertical Slices
 ```
+
+Jedes Unterpaket braucht ein `__init__.py` — die Registry findet Module über
+`pkgutil` und benötigt echte Pakete.
 
 ---
 
 ## 10. Startsequenz
 
-`main.py` ist die einzige Datei, die alles kennt:
+### Einstiegskette
+
+```
+main.py                 Prozess-Starter im Repo-Root, keine Logik
+   └── teabot.py        CLI-Argumente, Uvicorn-Start
+          └── app/      Composition Root: baut alles zusammen
+```
+
+`main.py` und `teabot.py` starten nur. Wer wissen will, wie TeaBot aufgebaut
+ist, liest `app/`. Der Split existiert, damit der Prozess-Einstieg (Signale,
+Uvicorn-Optionen, Exit-Codes) nicht mit der Verdrahtung der Komponenten
+vermischt wird.
+
+### Reihenfolge in `app/`
 
 1. Config laden und validieren — fehlende Pflichtwerte brechen sofort ab
 2. Logging konfigurieren, Log-Bus-Handler anhängen
 3. DB-Engine bauen, PRAGMAs setzen, Alembic-Head prüfen
-4. Registry ausführen
-5. FastAPI-App bauen, Router einhängen
-6. Client-Factory und Gateway bereitstellen
+4. Registry ausführen: Module einsammeln
+5. FastAPI-App bauen, Router einhängen, Templates und Static mounten
+6. Client-Factory und Gateway-Implementierung bereitstellen
 7. ClientManager erzeugen, in den App-State legen
-8. Uvicorn starten; Lifespan startet den Bot (falls Autostart aktiv)
+8. Uvicorn starten; der Lifespan startet den Bot, falls Autostart aktiv
+
+Config zuerst, damit ein fehlender Discord-Token beim Start scheitert und nicht
+erst beim ersten Connect.
+
+### Shutdown
+
+Umgekehrte Reihenfolge: erst Bot schließen, dann DB-Engine disposen. Andersherum
+laufen noch Handler auf einer toten Session.
+
+### Abhängigkeitsrichtung
+
+`app/` importiert aus `core/`, `db/`, `bot/`, `web/` und `modules/`. Der
+umgekehrte Weg ist verboten: **kein** Modul, Service oder Router importiert aus
+`app/`. Wer aus einem Modul heraus an den Client will, nutzt das `BotGateway`.
 
 ---
 
