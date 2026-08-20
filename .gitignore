@@ -221,6 +221,9 @@ __marimo__/
 
 .DS_Store
 
+.claude
 AGENTS.md
 DESIGN.md
 prompt_history
+
+data

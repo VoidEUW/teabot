@@ -1,6 +1,4 @@
-def main():
-    print("Hello from teabot!")
-
+from teabot.teabot import main
 
 if __name__ == "__main__":
     main()
