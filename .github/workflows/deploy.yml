@@ -68,6 +68,7 @@ jobs:
         env:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           COMPOSE_PROJECT_NAME: teabot
+          ENV_FILE: ${{ vars.DEPLOY_DIR }}/.env
 
       - name: Restart stack
         run: docker compose --env-file "${DEPLOY_DIR}/.env" up -d --remove-orphans
