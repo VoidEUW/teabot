@@ -64,7 +64,7 @@ jobs:
       - name: Run migrations
         run: |
           docker compose --env-file "${DEPLOY_DIR}/.env" \
-            run --rm app uv run alembic upgrade head
+            run --rm app alembic upgrade head
         env:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           COMPOSE_PROJECT_NAME: teabot
