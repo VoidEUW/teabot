@@ -1,8 +1,9 @@
-# syntax = docker/dockerfile:1
+# syntax=docker/dockerfile:1
 
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 RUN pip install --no-cache-dir uv
 
@@ -18,18 +19,20 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
+# Das venv aus dem Builder in den PATH. Damit sind alembic und teabot
+# direkt aufrufbar, und uv wird zur Laufzeit nicht mehr gebraucht.
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 RUN groupadd -r teabot && useradd -r -g teabot -d /app -s /sbin/nologin teabot
 
 COPY --from=builder /app /app
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-
-RUN mkdir -p /app/data && chown -R teabot:teabot /app/data
-
-RUN chmod +x docker-entrypoint.sh
+RUN mkdir -p /app/data \
+ && chown -R teabot:teabot /app/data \
+ && chmod +x docker-entrypoint.sh
 
 USER teabot
-
-VOLUME ["/app/data"]
 
 EXPOSE 8000
 
