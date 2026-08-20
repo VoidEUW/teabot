@@ -1,7 +1,62 @@
 [project]
 name = "teabot"
 version = "0.1.0"
-description = "Add your description here"
+description = "Self-hosted Discord bot management platform"
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "discord.py>=2.4,<3",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.32,<1",
+    "jinja2>=3.1,<4",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "aiosqlite>=0.20,<1",
+    "alembic>=1.14,<2",
+    "pydantic-settings>=2.6,<3",
+]
+
+[project.scripts]
+teabot = "teabot.teabot:main"
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.25,<1",
+    "pytest-cov>=6.0,<7",
+    "httpx>=0.28,<1",
+    "ruff>=0.8,<1",
+    "mypy>=1.14,<2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "ARG", "C4", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = "src"
+exclude = ["src/teabot/web/design/"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: marks tests that require a database",
+    "router: marks tests that use the HTTP client",
+]
