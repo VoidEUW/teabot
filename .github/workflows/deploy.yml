@@ -17,11 +17,13 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to Fuchs
-    # Runner läuft nativ auf Fuchs, auf derselben Maschine wie Docker.
-    # Das zweite Label stellt sicher, dass der Job auf genau diesem Host
-    # landet, falls später weitere Runner dazukommen.
     runs-on: [self-hosted, fuchs]
     environment: production
+
+    env:
+      DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+      COMPOSE_PROJECT_NAME: teabot
+      ENV_FILE: ${{ vars.DEPLOY_DIR }}/.env
 
     steps:
       - uses: actions/checkout@v7
@@ -77,7 +79,7 @@ jobs:
 
       - name: Directory writable?
         run: |
-          docker compose --env-file "${DEPLOY_DIR}/.env" \
+          docker compose --env-file "${ENV_FILE}" \
             run --rm app sh -c 'touch /app/data/.probe && rm /app/data/.probe'
         env:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
