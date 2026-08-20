@@ -33,6 +33,20 @@ jobs:
           echo "Ref:    ${{ inputs.ref || github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
 
+      - name: Preflight
+        run: |
+          [ -n "${DEPLOY_DIR}" ] || { echo "::error::vars.DEPLOY_DIR nicht gesetzt"; exit 1; }
+          [ -f "${DEPLOY_DIR}/.env" ] || { echo "::error::${DEPLOY_DIR}/.env fehlt"; exit 1; }
+          for KEY in DISCORD_TOKEN DISCORD_CLIENT_ID DISCORD_CLIENT_SECRET SESSION_SECRET APP_PORT DATABASE_URL; do
+            grep -q "^${KEY}=." "${DEPLOY_DIR}/.env" || { echo "::error::${KEY} fehlt in .env"; exit 1; }
+          done
+          command -v sqlite3 >/dev/null || { echo "::error::sqlite3 fehlt auf dem Host"; exit 1; }
+          [ -d "${DEPLOY_DIR}/data" ] || { echo "::error::${DEPLOY_DIR}/data fehlt"; exit 1; }
+          [ "$(stat -c '%u' "${DEPLOY_DIR}/data")" = "10001" ] \
+            || { echo "::error::${DEPLOY_DIR}/data gehört nicht UID 10001"; exit 1; }
+        env:
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+
       # .env liegt persistent auf dem Host und wird NICHT aus dem Repo erzeugt.
       - name: Verify environment file
         run: |
@@ -60,6 +74,11 @@ jobs:
         env:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           COMPOSE_PROJECT_NAME: teabot
+
+      - name: Directory writable?
+        run: |
+          docker compose --env-file "${DEPLOY_DIR}/.env" \
+            run --rm app sh -c 'touch /app/data/.probe && rm /app/data/.probe'
 
       - name: Run migrations
         run: |
