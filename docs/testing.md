@@ -19,6 +19,7 @@ async def test_create_ticket(db):
     t = await ticket_service.create(db, guild_id=1, author_id=42, subject="Hilfe")
     assert t.subject == "Hilfe"
 
+
 # Wertvoll: prüft eine Regel, die jemand entfernen könnte
 async def test_close_by_stranger_is_rejected(db, ticket, stranger):
     with pytest.raises(PermissionDenied):
@@ -152,8 +153,9 @@ Beispiele:
 ```python
 @given(st.lists(st.text(min_size=1), min_size=1, max_size=20))
 async def test_ticket_numbers_have_no_gaps(db, subjects):
-    tickets = [await ticket_service.create(db, guild_id=1, author_id=1, subject=s)
-               for s in subjects]
+    tickets = [
+        await ticket_service.create(db, guild_id=1, author_id=1, subject=s) for s in subjects
+    ]
     assert [t.number for t in tickets] == list(range(1, len(subjects) + 1))
 ```
 
