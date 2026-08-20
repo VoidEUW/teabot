@@ -1,9 +1,10 @@
 services:
   app:
     build: .
-    env_file: [] # kommt über --env-file
+    env_file:
+      - ${ENV_FILE:-.env}
     volumes:
-      - ${DATA_DIR:-/srv/teabot/data}:/app/data
+      - ${DATA_DIR:-./data}:/app/data
     ports:
       - "${APP_PORT}:8000"
     restart: unless-stopped
